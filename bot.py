@@ -21,7 +21,6 @@ if not TOKEN:
     raise RuntimeError("DISCORD_TOKEN is missing.")
 
 intents = discord.Intents.default()
-intents.message_content = True
 intents.guilds = True
 intents.voice_states = True
 
