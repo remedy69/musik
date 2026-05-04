@@ -14,7 +14,7 @@ import yt_dlp
 # =========================
 
 TOKEN = os.getenv("DISCORD_TOKEN", "").strip()
-PREFIX = os.getenv("COMMAND_PREFIX", "!").strip() or "!"
+PREFIX = os.getenv("COMMAND_PREFIX", "").strip() or "!"
 YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "").strip()
 
 if not TOKEN:
@@ -23,6 +23,8 @@ if not TOKEN:
 intents = discord.Intents.default()
 intents.guilds = True
 intents.voice_states = True
+# Required for commands to be read properly
+intents.message_content = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
@@ -143,8 +145,15 @@ async def ensure_voice(ctx: commands.Context) -> discord.VoiceClient:
     voice_client = ctx.guild.voice_client
     if voice_client is None:
         return await ctx.author.voice.channel.connect(timeout=60.0, reconnect=True, self_deaf=True)
+    
+    # 4006 Fix: Force cleanup and reconnect if we are on a stale gateway session
     if voice_client.channel != ctx.author.voice.channel:
-        await voice_client.move_to(ctx.author.voice.channel)
+        try:
+            await voice_client.disconnect(force=True)
+        except Exception:
+            pass
+        return await ctx.author.voice.channel.connect(timeout=60.0, reconnect=True, self_deaf=True)
+        
     return voice_client
 
 async def maybe_send_text(guild: discord.Guild, content: str, view: Optional[discord.ui.View] = None) -> None:
@@ -485,7 +494,12 @@ async def slash_play(interaction: discord.Interaction, query: str) -> None:
         if vc is None:
             vc = await interaction.user.voice.channel.connect(timeout=60.0, reconnect=True, self_deaf=True)
         elif vc.channel != interaction.user.voice.channel:
-            await vc.move_to(interaction.user.voice.channel)
+            # 4006 Fix: Force disconnect stale sessions during slash command connections
+            try:
+                await vc.disconnect(force=True)
+            except Exception:
+                pass
+            vc = await interaction.user.voice.channel.connect(timeout=60.0, reconnect=True, self_deaf=True)
 
         track = await extract_track(query, str(interaction.user))
         player.queue.append(track)
@@ -537,7 +551,11 @@ async def slash_join(interaction: discord.Interaction) -> None:
         if vc is None:
             await interaction.user.voice.channel.connect(timeout=60.0, reconnect=True, self_deaf=True)
         elif vc.channel != interaction.user.voice.channel:
-            await vc.move_to(interaction.user.voice.channel)
+            try:
+                await vc.disconnect(force=True)
+            except Exception:
+                pass
+            await interaction.user.voice.channel.connect(timeout=60.0, reconnect=True, self_deaf=True)
         await interaction.followup.send("✅ Joined voice.", ephemeral=True)
     except Exception as exc:
         await interaction.followup.send(f"❌ Could not join voice: {exc}", ephemeral=True)
