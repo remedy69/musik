@@ -42,6 +42,17 @@ YDL_OPTIONS = {
 if YOUTUBE_COOKIES:
     YDL_OPTIONS["cookiefile"] = YOUTUBE_COOKIES
 
+# --- NEW PO TOKEN CONFIGURATION ---
+po_token = os.getenv("PO_TOKEN", "").strip()
+visitor_data = os.getenv("VISITOR_DATA", "").strip()
+
+if po_token or visitor_data:
+    YDL_OPTIONS["extractor_args"] = {"youtube": {"player-client": ["web", "mweb"]}}
+    if po_token:
+        YDL_OPTIONS["extractor_args"]["youtube"]["po_token"] = [po_token]
+    if visitor_data:
+        YDL_OPTIONS["extractor_args"]["youtube"]["visitor_data"] = [visitor_data]
+
 BASE_FFMPEG_BEFORE_OPTIONS = (
     "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
 )
