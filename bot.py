@@ -375,27 +375,52 @@ class MusicPanelView(discord.ui.View):
     def __init__(self) -> None:
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Pause", style=discord.ButtonStyle.secondary, custom_id="music_pause")
+    # Row 1: Down / Back / Pause / Skip
+    @discord.ui.button(label="Down", style=discord.ButtonStyle.secondary, custom_id="music_volume_down", row=0)
+    async def down_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("Guild not found.", ephemeral=True)
+            return
+
+        player = get_player(interaction.guild.id)
+        player.volume = max(0, player.volume - 10)
+
+        vc = interaction.guild.voice_client
+        if vc and vc.source and isinstance(vc.source, discord.PCMVolumeTransformer):
+            vc.source.volume = max(0.0, min(player.volume / 100.0, 2.0))
+
+        await interaction.response.send_message(f"🔉 Volume: {player.volume}%", ephemeral=True)
+
+    @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary, custom_id="music_back", row=0)
+    async def back_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("Guild not found.", ephemeral=True)
+            return
+
+        vc = interaction.guild.voice_client
+        player = get_player(interaction.guild.id)
+
+        if vc and player.current and (vc.is_playing() or vc.is_paused()):
+            player.queue.appendleft(player.current)
+            vc.stop()
+            await interaction.response.send_message("⏮ Restarted current track.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Nothing to restart.", ephemeral=True)
+
+    @discord.ui.button(label="Pause", style=discord.ButtonStyle.secondary, custom_id="music_pause", row=0)
     async def pause_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         vc = interaction.guild.voice_client if interaction.guild else None
 
         if vc and vc.is_playing():
             vc.pause()
             await interaction.response.send_message("⏸ Paused.", ephemeral=True)
-        else:
-            await interaction.response.send_message("Nothing is playing.", ephemeral=True)
-
-    @discord.ui.button(label="Resume", style=discord.ButtonStyle.success, custom_id="music_resume")
-    async def resume_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        vc = interaction.guild.voice_client if interaction.guild else None
-
-        if vc and vc.is_paused():
+        elif vc and vc.is_paused():
             vc.resume()
             await interaction.response.send_message("▶️ Resumed.", ephemeral=True)
         else:
-            await interaction.response.send_message("Nothing is paused.", ephemeral=True)
+            await interaction.response.send_message("Nothing is playing.", ephemeral=True)
 
-    @discord.ui.button(label="Skip", style=discord.ButtonStyle.primary, custom_id="music_skip")
+    @discord.ui.button(label="Skip", style=discord.ButtonStyle.primary, custom_id="music_skip", row=0)
     async def skip_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         vc = interaction.guild.voice_client if interaction.guild else None
 
@@ -405,7 +430,59 @@ class MusicPanelView(discord.ui.View):
         else:
             await interaction.response.send_message("Nothing to skip.", ephemeral=True)
 
-    @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger, custom_id="music_stop")
+    # Row 2: Up
+    @discord.ui.button(label="Up", style=discord.ButtonStyle.secondary, custom_id="music_volume_up", row=1)
+    async def up_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("Guild not found.", ephemeral=True)
+            return
+
+        player = get_player(interaction.guild.id)
+        player.volume = min(200, player.volume + 10)
+
+        vc = interaction.guild.voice_client
+        if vc and vc.source and isinstance(vc.source, discord.PCMVolumeTransformer):
+            vc.source.volume = max(0.0, min(player.volume / 100.0, 2.0))
+
+        await interaction.response.send_message(f"🔊 Volume: {player.volume}%", ephemeral=True)
+
+    # Row 3: Shuffle / Loop / Stop
+    @discord.ui.button(label="Shuffle", style=discord.ButtonStyle.secondary, custom_id="music_shuffle", row=2)
+    async def shuffle_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("Guild not found.", ephemeral=True)
+            return
+
+        player = get_player(interaction.guild.id)
+
+        if len(player.queue) < 2:
+            await interaction.response.send_message("Need at least 2 queued songs to shuffle.", ephemeral=True)
+            return
+
+        items = list(player.queue)
+        random.shuffle(items)
+        player.queue = deque(items)
+
+        await interaction.response.send_message("🔀 Queue shuffled.", ephemeral=True)
+
+    @discord.ui.button(label="Loop", style=discord.ButtonStyle.success, custom_id="music_loop", row=2)
+    async def loop_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not interaction.guild:
+            await interaction.response.send_message("Guild not found.", ephemeral=True)
+            return
+
+        player = get_player(interaction.guild.id)
+
+        if player.loop_mode == "off":
+            player.loop_mode = "track"
+        elif player.loop_mode == "track":
+            player.loop_mode = "queue"
+        else:
+            player.loop_mode = "off"
+
+        await interaction.response.send_message(f"🔁 Loop mode: {player.loop_mode}", ephemeral=True)
+
+    @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger, custom_id="music_stop", row=2)
     async def stop_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         if not interaction.guild:
             await interaction.response.send_message("Guild not found.", ephemeral=True)
