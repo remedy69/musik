@@ -68,7 +68,6 @@ YDL_OPTIONS = {
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
     "extract_flat": False,
-    "impersonate": "chrome",
     "nocheckcertificate": True,
 }
 
