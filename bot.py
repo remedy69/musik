@@ -5,6 +5,11 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Optional
 
+import re
+import traceback
+from pathlib import Path
+from urllib.parse import urlparse, parse_qs
+
 import discord
 from discord.ext import commands
 import yt_dlp
